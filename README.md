@@ -140,68 +140,11 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 0 7,18 * * * cd /path/to/sms_news && python3 send_daily_news.py
 ```
 
-### Option 2: GitHub Actions (Cloud-based)
-
-If you don't want to run a server 24/7, you can use GitHub Actions:
-
-1. Create `.github/workflows/daily-news.yml`:
-   ```yaml
-   name: Daily News Service
-
-   on:
-     schedule:
-       - cron: '0 7 * * *'  # 7 AM UTC
-     workflow_dispatch:  # Allow manual trigger
-
-   jobs:
-     send-news:
-       runs-on: ubuntu-latest
-       steps:
-         - uses: actions/checkout@v3
-
-         - name: Set up Python
-           uses: actions/setup-python@v4
-           with:
-             python-version: '3.10'
-
-         - name: Install dependencies
-           run: pip install -r requirements.txt
-
-         - name: Send daily news
-           env:
-             TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-             TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-             TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
-             AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
-             GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-             CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
-           run: python3 send_daily_news.py
-   ```
-
 2. Add secrets in GitHub repository settings:
    - Settings → Secrets and variables → Actions → New repository secret
    - Add all required environment variables
 
 **Note**: GitHub Actions scheduled workflows can be delayed by 3-10 minutes during high load times.
-
-## Managing Subscribers
-
-### Add a Subscriber
-
-Edit `subscribers.json`:
-```json
-{
-  "subscribers": [
-    "+11234567890",
-    "+10987654321",
-    "+15555555555"  // Add new number here
-  ]
-}
-```
-
-### Remove a Subscriber
-
-Simply delete their phone number from `subscribers.json`.
 
 ## Monitoring and Logs
 
@@ -234,39 +177,11 @@ Example:
 2025-01-26 07:00:25 - sms_service - INFO - SMS sent successfully to +11234567890
 ```
 
-## Cost Optimization
-
-### Twilio Costs
-- SMS: ~$0.0075 per message in the US
-- Daily cost: $0.0075 × number of subscribers
-- Example: 10 subscribers = $0.075/day = ~$2.25/month
-
-### AI API Costs
-
-**Option 1: Gemini (Recommended for Personal Use)**
-- **Free tier**: 15 requests/min, 1M tokens/min, 1500 requests/day
-- **Cost**: $0/month (within free tier limits)
-- **Perfect for**: Daily news summaries (4 categories = 4 requests/day)
-
-**Option 2: Claude**
-- Sonnet 3.5: ~$0.003 per request (for typical news summaries)
-- Haiku 3.5: ~$0.001 per request (cheaper alternative)
-- Daily cost: ~$0.012 for 4 categories
-- Monthly: ~$0.36
-
-### Total Estimated Cost
-
-**For 10 subscribers:**
-- **With Gemini (free tier)**: ~$2.25/month (SMS only)
-- **With Claude Sonnet**: ~$2.60/month ($2.25 SMS + $0.36 API)
-- **With Claude Haiku**: ~$2.35/month ($2.25 SMS + $0.10 API)
-
 ## Customization
 
 ### Switch AI Providers
 
 To switch between Claude and Gemini, simply update your `.env` file:
-
 ```bash
 # Use Gemini (free tier)
 AI_PROVIDER=gemini
@@ -276,17 +191,6 @@ GEMINI_API_KEY=your_gemini_api_key_here
 AI_PROVIDER=claude
 CLAUDE_API_KEY=your_claude_api_key_here
 ```
-
-You can also override the default models:
-
-```bash
-# Use faster/cheaper Gemini model
-GEMINI_MODEL=gemini-1.5-flash
-
-# Use cheaper Claude model
-CLAUDE_MODEL=claude-3-5-haiku-20241022
-```
-
 ### Change News Sources
 
 Edit `news_aggregator/sources.py` to add/remove RSS feeds:
@@ -368,49 +272,6 @@ python3 send_daily_news.py
 
 # Run with verbose logging
 python3 send_daily_news.py 2>&1 | tee logs/manual_run.log
-```
-
-## Project Structure
-
-```
-sms_news/
-├── send_daily_news.py       # Main script
-├── sms_service.py           # Twilio SMS with retry logic
-├── ai_summarizer.py         # AI provider integration (Claude/Gemini)
-├── test_ai_summaries.py     # Test script for AI configuration
-├── subscribers.json         # Subscriber phone numbers
-├── news_aggregator/
-│   ├── fetcher.py          # RSS feed fetcher
-│   ├── sources.py          # News source configurations
-│   └── scheduler.py        # (Legacy - not used in daily mode)
-├── database/
-│   └── models.py           # (Legacy - not used in daily mode)
-├── logs/
-│   └── daily_news.log      # Execution logs
-├── .env                     # Environment variables (create from .env.example)
-├── .env.example            # Environment variable template
-├── requirements.txt        # Python dependencies
-└── README.md              # This file
-```
-
-## License
-
-MIT License - See LICENSE file for details
-
-## Contributing
-
-Contributions welcome! Please open an issue or submit a pull request.
-
-## Support
-
-For issues or questions:
-1. Check logs: `logs/daily_news.log`
-2. Review troubleshooting section
-3. Open a GitHub issue with:
-   - Error messages
-   - Relevant log excerpts
-   - Steps to reproduce
 
 ---
 
-**Stay informed, one text at a time!** 📱📰
