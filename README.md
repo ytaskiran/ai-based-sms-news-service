@@ -1,0 +1,416 @@
+# SMS News Service - Daily Briefing Edition
+
+An automated SMS-based news service that delivers AI-powered daily news briefings via text message. Perfect for staying informed on basic phones or when smartphone access is limited.
+
+## Overview
+
+This service runs as a scheduled daily job that:
+1. Fetches news from RSS feeds across multiple categories (General, AI/Tech, Technology, Local)
+2. Generates concise, AI-powered summaries using Claude or Gemini APIs
+3. Sends daily briefings to subscribers via SMS (Twilio)
+4. Implements retry logic with exponential backoff for reliable delivery
+
+## Features
+
+- 📰 **Multi-Category News**: General world news, AI/ML developments, tech industry, and local news
+- 🤖 **AI-Powered Summaries**: Configurable AI providers (Claude or Gemini) for SMS-friendly briefings
+- 💰 **Cost-Effective**: Use Gemini's free tier (15 RPM, 1M TPM, 1500 RPD) for zero AI costs
+- 📱 **SMS Delivery**: Reliable SMS delivery via Twilio with automatic retry
+- ⏰ **Scheduled Delivery**: Runs daily at a specified time (default: 7 AM)
+- 🔄 **Retry Logic**: Exponential backoff with up to 5 retry attempts per recipient
+- 📊 **Comprehensive Logging**: Detailed logs for monitoring and debugging
+
+## Architecture
+
+```
+RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscribers
+```
+
+### Components:
+
+- **send_daily_news.py**: Main script that orchestrates the daily news service
+- **news_aggregator/**: Fetches and parses RSS feeds
+- **ai_summarizer.py**: Generates summaries using Claude or Gemini APIs (configurable)
+- **sms_service.py**: Handles SMS delivery with retry logic
+- **subscribers.json**: List of subscriber phone numbers
+- **logs/**: Execution logs
+
+## Setup
+
+### Prerequisites
+
+- Python 3.8+
+- Twilio account with SMS-enabled phone number
+- AI API key (choose one):
+  - **Gemini API** (recommended for personal use - free tier available)
+  - **Claude API** (paid, higher quality)
+- Server or computer that runs at scheduled time
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   cd sms_news
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Configure environment variables**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your credentials
+   ```
+
+   Required variables:
+   - `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
+   - `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
+   - `TWILIO_PHONE_NUMBER`: Your Twilio phone number (E.164 format, e.g., +1234567890)
+   - `AI_PROVIDER`: Choose `gemini` or `claude` (default: `claude`)
+   - `GEMINI_API_KEY`: Your Google AI API key (if using Gemini - get from https://aistudio.google.com/apikey)
+   - `CLAUDE_API_KEY`: Your Anthropic API key (if using Claude)
+
+4. **Add subscribers**:
+   Edit `subscribers.json` and add phone numbers in E.164 format:
+   ```json
+   {
+     "subscribers": [
+       "+11234567890",
+       "+10987654321"
+     ]
+   }
+   ```
+
+5. **Test AI provider configuration**:
+   ```bash
+   python3 test_ai_summaries.py
+   ```
+
+   This will test your configured AI provider with sample articles.
+
+6. **Test the full script**:
+   ```bash
+   python3 send_daily_news.py
+   ```
+
+   This will:
+   - Fetch latest news from RSS feeds
+   - Generate AI summaries
+   - Send to all subscribers
+   - Log results to `logs/daily_news.log`
+
+## Scheduling with Cron
+
+### Option 1: System Cron (Recommended)
+
+1. **Open crontab**:
+   ```bash
+   crontab -e
+   ```
+
+2. **Add cron job** (runs at 7 AM daily):
+   ```bash
+   0 7 * * * cd /path/to/sms_news && /usr/bin/python3 send_daily_news.py >> logs/cron.log 2>&1
+   ```
+
+   Replace `/path/to/sms_news` with your actual project path.
+
+3. **Save and exit**
+
+4. **Verify cron job**:
+   ```bash
+   crontab -l
+   ```
+
+### Cron Schedule Examples
+
+```bash
+# Daily at 7 AM
+0 7 * * * cd /path/to/sms_news && python3 send_daily_news.py
+
+# Daily at 8:30 AM
+30 8 * * * cd /path/to/sms_news && python3 send_daily_news.py
+
+# Weekdays only at 7 AM
+0 7 * * 1-5 cd /path/to/sms_news && python3 send_daily_news.py
+
+# Twice daily (7 AM and 6 PM)
+0 7,18 * * * cd /path/to/sms_news && python3 send_daily_news.py
+```
+
+### Option 2: GitHub Actions (Cloud-based)
+
+If you don't want to run a server 24/7, you can use GitHub Actions:
+
+1. Create `.github/workflows/daily-news.yml`:
+   ```yaml
+   name: Daily News Service
+
+   on:
+     schedule:
+       - cron: '0 7 * * *'  # 7 AM UTC
+     workflow_dispatch:  # Allow manual trigger
+
+   jobs:
+     send-news:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v3
+
+         - name: Set up Python
+           uses: actions/setup-python@v4
+           with:
+             python-version: '3.10'
+
+         - name: Install dependencies
+           run: pip install -r requirements.txt
+
+         - name: Send daily news
+           env:
+             TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+             TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+             TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_PHONE_NUMBER }}
+             AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+             GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+             CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+           run: python3 send_daily_news.py
+   ```
+
+2. Add secrets in GitHub repository settings:
+   - Settings → Secrets and variables → Actions → New repository secret
+   - Add all required environment variables
+
+**Note**: GitHub Actions scheduled workflows can be delayed by 3-10 minutes during high load times.
+
+## Managing Subscribers
+
+### Add a Subscriber
+
+Edit `subscribers.json`:
+```json
+{
+  "subscribers": [
+    "+11234567890",
+    "+10987654321",
+    "+15555555555"  // Add new number here
+  ]
+}
+```
+
+### Remove a Subscriber
+
+Simply delete their phone number from `subscribers.json`.
+
+## Monitoring and Logs
+
+### View Logs
+
+```bash
+# View latest logs
+tail -f logs/daily_news.log
+
+# View today's logs
+grep "$(date +%Y-%m-%d)" logs/daily_news.log
+
+# Check for errors
+grep ERROR logs/daily_news.log
+```
+
+### Log Format
+
+Logs include:
+- Timestamp
+- Logger name
+- Log level
+- Message
+
+Example:
+```
+2025-01-26 07:00:01 - __main__ - INFO - Starting daily news service
+2025-01-26 07:00:05 - news_aggregator.fetcher - INFO - Fetched 15 articles for general
+2025-01-26 07:00:15 - ai_summarizer - INFO - Generated summary for general (842 chars)
+2025-01-26 07:00:25 - sms_service - INFO - SMS sent successfully to +11234567890
+```
+
+## Cost Optimization
+
+### Twilio Costs
+- SMS: ~$0.0075 per message in the US
+- Daily cost: $0.0075 × number of subscribers
+- Example: 10 subscribers = $0.075/day = ~$2.25/month
+
+### AI API Costs
+
+**Option 1: Gemini (Recommended for Personal Use)**
+- **Free tier**: 15 requests/min, 1M tokens/min, 1500 requests/day
+- **Cost**: $0/month (within free tier limits)
+- **Perfect for**: Daily news summaries (4 categories = 4 requests/day)
+
+**Option 2: Claude**
+- Sonnet 3.5: ~$0.003 per request (for typical news summaries)
+- Haiku 3.5: ~$0.001 per request (cheaper alternative)
+- Daily cost: ~$0.012 for 4 categories
+- Monthly: ~$0.36
+
+### Total Estimated Cost
+
+**For 10 subscribers:**
+- **With Gemini (free tier)**: ~$2.25/month (SMS only)
+- **With Claude Sonnet**: ~$2.60/month ($2.25 SMS + $0.36 API)
+- **With Claude Haiku**: ~$2.35/month ($2.25 SMS + $0.10 API)
+
+## Customization
+
+### Switch AI Providers
+
+To switch between Claude and Gemini, simply update your `.env` file:
+
+```bash
+# Use Gemini (free tier)
+AI_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Or use Claude (paid)
+AI_PROVIDER=claude
+CLAUDE_API_KEY=your_claude_api_key_here
+```
+
+You can also override the default models:
+
+```bash
+# Use faster/cheaper Gemini model
+GEMINI_MODEL=gemini-1.5-flash
+
+# Use cheaper Claude model
+CLAUDE_MODEL=claude-3-5-haiku-20241022
+```
+
+### Change News Sources
+
+Edit `news_aggregator/sources.py` to add/remove RSS feeds:
+
+```python
+NEWS_SOURCES = {
+    "general": [
+        {
+            "name": "Your News Source",
+            "url": "https://example.com/rss",
+            "type": "rss"
+        }
+    ]
+}
+```
+
+### Adjust Summary Length
+
+Edit `ai_summarizer.py` and modify the prompt:
+
+```python
+# Change max_tokens for longer/shorter summaries
+message = self.client.messages.create(
+    model=self.model,
+    max_tokens=2048,  # Increase for longer summaries
+    messages=[...]
+)
+```
+
+### Change Delivery Time
+
+Update your cron schedule (see Scheduling section above).
+
+## Troubleshooting
+
+### Script doesn't run
+- Check cron logs: `grep CRON /var/log/syslog`
+- Verify Python path: `which python3`
+- Check file permissions: `ls -la send_daily_news.py`
+
+### SMS not sending
+- Verify Twilio credentials in `.env`
+- Check Twilio account balance
+- Verify phone numbers are in E.164 format (+1234567890)
+- Check logs: `grep ERROR logs/daily_news.log`
+
+### No news fetched
+- Check internet connection
+- Verify RSS feed URLs are accessible
+- Check logs for specific feed errors
+
+### API errors
+- Verify Claude API key is valid
+- Check API quota/limits
+- Review error messages in logs
+
+## Development
+
+### Run Tests
+```bash
+# Test AI provider configuration
+python3 test_ai_summaries.py
+
+# Test news fetching
+python3 -c "from news_aggregator.fetcher import fetch_news; print(fetch_news('general'))"
+
+# Test AI summarization with specific provider
+python3 -c "from ai_summarizer import NewsSummarizer; s = NewsSummarizer(provider='gemini'); print('Gemini configured')"
+python3 -c "from ai_summarizer import NewsSummarizer; s = NewsSummarizer(provider='claude'); print('Claude configured')"
+
+# Test full script
+python3 send_daily_news.py
+```
+
+### Manual Execution
+```bash
+# Run the daily news script manually
+python3 send_daily_news.py
+
+# Run with verbose logging
+python3 send_daily_news.py 2>&1 | tee logs/manual_run.log
+```
+
+## Project Structure
+
+```
+sms_news/
+├── send_daily_news.py       # Main script
+├── sms_service.py           # Twilio SMS with retry logic
+├── ai_summarizer.py         # AI provider integration (Claude/Gemini)
+├── test_ai_summaries.py     # Test script for AI configuration
+├── subscribers.json         # Subscriber phone numbers
+├── news_aggregator/
+│   ├── fetcher.py          # RSS feed fetcher
+│   ├── sources.py          # News source configurations
+│   └── scheduler.py        # (Legacy - not used in daily mode)
+├── database/
+│   └── models.py           # (Legacy - not used in daily mode)
+├── logs/
+│   └── daily_news.log      # Execution logs
+├── .env                     # Environment variables (create from .env.example)
+├── .env.example            # Environment variable template
+├── requirements.txt        # Python dependencies
+└── README.md              # This file
+```
+
+## License
+
+MIT License - See LICENSE file for details
+
+## Contributing
+
+Contributions welcome! Please open an issue or submit a pull request.
+
+## Support
+
+For issues or questions:
+1. Check logs: `logs/daily_news.log`
+2. Review troubleshooting section
+3. Open a GitHub issue with:
+   - Error messages
+   - Relevant log excerpts
+   - Steps to reproduce
+
+---
+
+**Stay informed, one text at a time!** 📱📰

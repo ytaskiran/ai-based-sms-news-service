@@ -1,10 +1,13 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-twilio==8.10.1
-pydantic==2.4.2
+# Core dependencies
 python-dotenv==1.0.0
 requests==2.31.0
-python-multipart==0.0.6
-anthropic==0.39.0
+
+# SMS service
+twilio==8.10.1
+
+# AI summarization (choose one or both)
+anthropic==0.39.0  # Claude API
+google-generativeai>=0.8.0  # Gemini API (free tier available)
+
+# RSS feed parsing
 feedparser==6.0.11
-apscheduler==3.10.4

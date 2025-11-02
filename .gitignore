@@ -1,4 +1,11 @@
-.env*
-CLAUDE.MD
-PROGRESS.MD
-
+.env
+*.log
+logs/*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.DS_Store
+CLAUDE.md
