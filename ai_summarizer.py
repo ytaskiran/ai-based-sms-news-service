@@ -143,21 +143,36 @@ class NewsSummarizer:
         Returns:
             Default prompt template string
         """
-        return """You are a news summarization assistant. Create a concise, SMS-friendly daily news briefing for {category_desc}.
+        return """You are a news summarization assistant. Create a concise, SMS-friendly daily news briefing covering {category_desc}.
 
-Here are today's top articles:
+Here are today's top articles organized by category:
 {article_text}
 
-Generate a brief, informative summary that:
-1. Highlights the most important stories (3-5 key stories)
-2. Is optimized for SMS delivery (concise but informative)
-3. Uses clear, accessible language
-4. Can be 500-1200 characters (aim for readability on a phone screen)
-5. Includes a brief headline or key point for each major story
+Generate a comprehensive daily briefing that:
+1. Covers ALL categories provided (general news, AI/ML, technology, local news)
+2. Highlights the most important stories from each category (2-4 stories per category)
+3. Is optimized for SMS delivery (concise but informative)
+4. Uses clear, accessible language
+5. Organizes content with clear category headers and separators
 6. Does NOT use emojis or special formatting
-7. Separates stories with clear line breaks
+7. Keeps total length reasonable for SMS (1500-2500 characters total)
 
-Format as a clean text summary suitable for SMS delivery."""
+Format example:
+WORLD NEWS
+----------
+[2-3 key stories with brief summaries]
+
+AI & MACHINE LEARNING
+---------------------
+[2-3 key AI/ML developments]
+
+TECHNOLOGY
+----------
+[2-3 key tech stories]
+
+LOCAL NEWS
+----------
+[2-3 key local updates]"""
 
     def summarize_articles(
         self,
@@ -293,34 +308,135 @@ Format as a clean text summary suitable for SMS delivery."""
 
     def generate_daily_briefing(
         self,
-        articles_by_category: Dict[str, List[Dict]]
+        articles_by_category: Dict[str, List[Dict]],
+        max_articles_per_category: int = 10
     ) -> str:
         """
-        Generate comprehensive daily briefing with all categories
+        Generate comprehensive daily briefing with all categories in a single AI call
+
+        Args:
+            articles_by_category: Dict mapping category names to article lists
+            max_articles_per_category: Maximum number of articles per category
+
+        Returns:
+            Complete daily briefing text
+        """
+        # Filter out empty categories and limit articles
+        filtered_categories = {}
+        for category, articles in articles_by_category.items():
+            if articles:
+                filtered_categories[category] = articles[:max_articles_per_category]
+
+        if not filtered_categories:
+            logger.warning("No articles available for any category")
+            return "No news available at this time."
+
+        # Build single prompt with all categories
+        prompt = self._build_multi_category_prompt(filtered_categories)
+
+        try:
+            logger.info(f"Generating daily briefing for {len(filtered_categories)} categories using {self.provider_name}")
+            logger.info(f"Total articles: {sum(len(articles) for articles in filtered_categories.values())}")
+
+            # Log the full prompt for debugging
+            logger.debug("=" * 80)
+            logger.debug("PROMPT TO AI MODEL:")
+            logger.debug("=" * 80)
+            logger.debug(prompt)
+            logger.debug("=" * 80)
+
+            # Also print to console for immediate visibility
+            print("\n" + "=" * 80)
+            print("PROMPT TO AI MODEL:")
+            print("=" * 80)
+            print(prompt)
+            print("=" * 80 + "\n")
+
+            # Single AI call for all categories
+            briefing = self.provider.summarize(prompt, max_tokens=2048)
+
+            logger.info(f"Generated complete briefing ({len(briefing)} chars)")
+
+            return briefing
+
+        except Exception as e:
+            logger.error(f"Error generating daily briefing with {self.provider_name}: {e}")
+            return self._fallback_multi_category_summary(filtered_categories)
+
+    def _build_multi_category_prompt(self, articles_by_category: Dict[str, List[Dict]]) -> str:
+        """
+        Build prompt for all categories at once using template from file
 
         Args:
             articles_by_category: Dict mapping category names to article lists
 
         Returns:
-            Complete daily briefing text
+            Formatted prompt string
         """
-        briefing = "DAILY NEWS BRIEFING\n"
-        briefing += "=" * 30 + "\n\n"
+        # Category descriptions
+        category_instructions = {
+            "general": "world news and current events",
+            "ai": "AI and machine learning developments",
+            "tech": "technology industry news and innovations",
+            "local": "local news and community updates"
+        }
 
-        categories = ["general", "ai", "tech", "local"]
+        # Build organized article text with category sections
+        article_text = ""
+        for category, articles in articles_by_category.items():
+            category_desc = category_instructions.get(category, category)
+            article_text += f"\n### {category.upper()} ({category_desc}) ###\n"
 
-        for category in categories:
-            articles = articles_by_category.get(category, [])
+            for i, article in enumerate(articles, 1):
+                title = article.get('title', 'No title')
+                source = article.get('source', 'Unknown')
+                content = article.get('content', '')[:500]
 
-            if not articles:
-                continue
+                article_text += f"\n{i}. {title}\n"
+                article_text += f"   Source: {source}\n"
+                if content:
+                    article_text += f"   Preview: {content}\n"
 
-            # Generate summary for this category
-            summary = self.summarize_articles(articles, category)
+            article_text += "\n"
 
-            briefing += f"\n{summary}\n"
-            briefing += "\n" + "-" * 30 + "\n"
+        # Use template from file with all categories
+        prompt = self.prompt_template.format(
+            category_desc="multiple categories including world news, AI/ML, technology, and local news",
+            article_text=article_text
+        )
 
-        briefing += "\n\nStay informed!"
+        return prompt
 
-        return briefing
+    def _fallback_multi_category_summary(self, articles_by_category: Dict[str, List[Dict]]) -> str:
+        """
+        Generate simple fallback summary for all categories if AI fails
+
+        Args:
+            articles_by_category: Dict mapping category names to article lists
+
+        Returns:
+            Basic text summary
+        """
+        category_labels = {
+            "general": "GENERAL NEWS",
+            "ai": "AI NEWS",
+            "tech": "TECH NEWS",
+            "local": "LOCAL NEWS"
+        }
+
+        summary = "DAILY NEWS BRIEFING\n\n"
+
+        for category, articles in articles_by_category.items():
+            label = category_labels.get(category, category.upper())
+            summary += f"{label}\n{'-' * len(label)}\n"
+
+            for i, article in enumerate(articles[:5], 1):
+                title = article.get('title', 'No title')[:100]
+                source = article.get('source', 'Unknown')
+                summary += f"{i}. {title}\n   ({source})\n\n"
+
+            summary += "\n"
+
+        summary += "AI summary temporarily unavailable."
+
+        return summary

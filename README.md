@@ -14,11 +14,13 @@ This service runs as a scheduled daily job that:
 
 - 📰 **Multi-Category News**: General world news, AI/ML developments, tech industry, and local news
 - 🤖 **AI-Powered Summaries**: Configurable AI providers (Claude or Gemini) for SMS-friendly briefings
+- ⚡ **Single API Call**: All categories summarized in one AI request for efficiency
+- 🎨 **Customizable Prompts**: Configure AI behavior via editable prompt template file
 - 💰 **Cost-Effective**: Use Gemini's free tier (15 RPM, 1M TPM, 1500 RPD) for zero AI costs
 - 📱 **SMS Delivery**: Reliable SMS delivery via Twilio with automatic retry
 - ⏰ **Scheduled Delivery**: Runs daily at a specified time (default: 7 AM)
 - 🔄 **Retry Logic**: Exponential backoff with up to 5 retry attempts per recipient
-- 📊 **Comprehensive Logging**: Detailed logs for monitoring and debugging
+- 📊 **Comprehensive Logging**: Detailed logs for monitoring and debugging with prompt visibility
 
 ## Architecture
 
@@ -31,6 +33,7 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 - **send_daily_news.py**: Main script that orchestrates the daily news service
 - **news_aggregator/**: Fetches and parses RSS feeds
 - **ai_summarizer.py**: Generates summaries using Claude or Gemini APIs (configurable)
+- **prompt_config.txt**: Customizable AI prompt template
 - **sms_service.py**: Handles SMS delivery with retry logic
 - **subscribers.json**: List of subscriber phone numbers
 - **logs/**: Execution logs
@@ -213,7 +216,15 @@ NEWS_SOURCES = {
 
 ### Customize AI Prompt
 
-The AI summarization prompt is now fully configurable via the `prompt_config.txt` file:
+The AI summarization prompt is fully configurable via the `prompt_config.txt` file. The system now generates a **single comprehensive briefing** for all categories in one API call, making it more efficient and cost-effective.
+
+**How it works:**
+- All categories (general, AI, tech, local) are included in one prompt
+- One AI API call generates the complete daily briefing
+- Articles are organized by category in the prompt
+- More cost-effective: 1 API call instead of 4
+
+**Customization:**
 
 **1. Edit the prompt file**:
    ```bash
@@ -221,16 +232,35 @@ The AI summarization prompt is now fully configurable via the `prompt_config.txt
    ```
 
 **2. Customize the template** using these placeholders:
-   - `{category_desc}`: Automatically filled with category description (e.g., "world news and current events")
-   - `{article_text}`: Automatically filled with formatted article list
+   - `{category_desc}`: Automatically filled with "multiple categories including world news, AI/ML, technology, and local news"
+   - `{article_text}`: Automatically filled with all articles organized by category with headers
 
-**3. Environment variable override** (optional):
+   Example article_text format:
+   ```
+   ### GENERAL (world news and current events) ###
+   1. Article Title
+      Source: BBC
+      Preview: Content...
+
+   ### AI (AI and machine learning developments) ###
+   1. Article Title
+      Source: OpenAI
+      Preview: Content...
+   ```
+
+**3. Debug mode** - The full prompt is logged to console for debugging:
+   ```bash
+   python3 send_daily_news.py --test
+   # You'll see the complete prompt printed before AI processing
+   ```
+
+**4. Environment variable override** (optional):
    ```bash
    # Use a different prompt file
    PROMPT_CONFIG_FILE=/path/to/custom_prompt.txt
    ```
 
-**4. Programmatic override** (optional):
+**5. Programmatic override** (optional):
    ```python
    from ai_summarizer import NewsSummarizer
    summarizer = NewsSummarizer(prompt_file='custom_prompt.txt')

@@ -1,33 +1,53 @@
-You are a news summarization assistant. Create a concise, SMS-friendly daily news briefing for {category_desc}.
+You are a news summarization assistant. Create a concise, SMS-friendly daily news briefing covering {category_desc}.
 
-Here are today's top articles:
+Here are today's top articles organized by category:
 {article_text}
 
-Generate a brief, informative summary that:
-1. Highlights the most important stories (3-5 key stories)
-2. Is optimized for SMS delivery (concise but informative)
-3. Uses clear, accessible language
-4. Can be 500-1200 characters (aim for readability on a phone screen)
-5. Includes a brief headline or key point for each major story
+Generate a comprehensive daily briefing that:
+1. Covers ALL categories provided (general news, AI/ML, technology, local news)
+2. Highlights the most important stories from each category (2-4 stories per category)
+3. Is optimized for SMS delivery (concise but informative)
+4. Uses clear, accessible language
+5. Organizes content with clear category headers and separators
 6. Does NOT use emojis or special formatting
-7. Separates stories with clear line breaks
+7. Keeps total length reasonable for SMS (1500-2500 characters total)
 
-Format as a clean text summary suitable for SMS delivery.
+Format example:
+WORLD NEWS
+----------
+[2-3 key stories with brief summaries]
+
+AI & MACHINE LEARNING
+---------------------
+[2-3 key AI/ML developments]
+
+TECHNOLOGY
+----------
+[2-3 key tech stories]
+
+LOCAL NEWS
+----------
+[2-3 key local updates]
 
 ---
 
 CUSTOMIZATION EXAMPLES:
 
 Example 1 - More concise style:
-"Summarize {category_desc} in 3-4 bullet points, max 500 chars total."
+"Create a ultra-brief daily briefing for {category_desc}.
+Max 1000 chars total. 1-2 stories per category maximum."
 
-Example 2 - Specific format:
-"Create a numbered list of the top 3 stories about {category_desc}.
-For each story: Title, 1-sentence summary, source name."
+Example 2 - Bullet point format:
+"Summarize today's news about {category_desc} using bullet points.
+- Category headers should be in ALL CAPS
+- Each story as a single bullet point with source
+- Keep each bullet under 100 characters"
 
-Example 3 - Different tone:
-"Write a friendly, conversational summary of {category_desc} for a general audience.
-Focus on the most impactful stories and explain why they matter."
+Example 3 - Narrative style:
+"Write a friendly, conversational news briefing about {category_desc}.
+Group related stories together and explain why they matter.
+Focus on the bigger picture and trends, not just individual stories."
 
 Note: The placeholders {category_desc} and {article_text} will be automatically
 filled with the appropriate content. Do not remove these placeholders.
+The {article_text} will contain articles organized by category with headers.

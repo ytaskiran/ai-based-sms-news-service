@@ -58,7 +58,6 @@ class DailyNewsService:
 
         # In-memory cache for this execution
         self.articles_cache = {}
-        self.summaries_cache = {}
 
     def load_subscribers(self) -> List[str]:
         """
@@ -119,30 +118,54 @@ class DailyNewsService:
 
         return self.articles_cache
 
-    def generate_summaries(self) -> Dict[str, str]:
+    def generate_single_briefing(self) -> str:
         """
-        Generate AI summaries for all categories
+        Generate AI summary for all categories in a single API call
 
         Returns:
-            Dict mapping category names to summary text
+            Complete daily briefing text
         """
-        logger.info("Generating AI summaries for all categories...")
+        logger.info("Generating AI briefing for all categories in single call...")
+
+        try:
+            briefing = self.summarizer.generate_daily_briefing(self.articles_cache)
+            logger.info(f"Generated complete briefing ({len(briefing)} chars)")
+            return briefing
+        except Exception as e:
+            logger.error(f"Error generating briefing: {e}")
+            # Create fallback briefing
+            return self._create_fallback_briefing()
+
+    def _create_fallback_briefing(self) -> str:
+        """Create complete fallback briefing if AI fails"""
+        category_labels = {
+            "general": "GENERAL NEWS",
+            "ai": "AI NEWS",
+            "tech": "TECH NEWS",
+            "local": "LOCAL NEWS"
+        }
+
+        briefing = f"DAILY NEWS BRIEFING\n{datetime.now().strftime('%B %d, %Y')}\n"
+        briefing += "=" * 40 + "\n\n"
 
         for category, articles in self.articles_cache.items():
             if not articles:
-                logger.info(f"No articles for {category}, skipping summary")
                 continue
 
-            try:
-                summary = self.summarizer.summarize_articles(articles, category)
-                self.summaries_cache[category] = summary
-                logger.info(f"Generated summary for {category} ({len(summary)} chars)")
-            except Exception as e:
-                logger.error(f"Error generating summary for {category}: {e}")
-                # Create fallback summary
-                self.summaries_cache[category] = self._create_fallback_summary(articles, category)
+            label = category_labels.get(category, category.upper())
+            briefing += f"{label}\n{'-' * len(label)}\n\n"
 
-        return self.summaries_cache
+            for i, article in enumerate(articles[:5], 1):
+                title = article.get('title', 'No title')[:80]
+                briefing += f"{i}. {title}\n"
+
+            briefing += "\n"
+
+        briefing += "=" * 40 + "\n"
+        briefing += "AI summary temporarily unavailable.\n"
+        briefing += "Stay informed! Reply STOP to unsubscribe."
+
+        return briefing
 
     def _create_fallback_summary(self, articles: List[Dict], category: str) -> str:
         """Create simple fallback if AI summary fails"""
@@ -162,43 +185,6 @@ class DailyNewsService:
 
         return summary
 
-    def create_daily_briefing(self) -> str:
-        """
-        Create complete daily briefing with all categories
-
-        Returns:
-            Complete briefing text
-        """
-        logger.info("Creating daily briefing...")
-
-        briefing = f"DAILY NEWS BRIEFING\n{datetime.now().strftime('%B %d, %Y')}\n"
-        briefing += "=" * 40 + "\n\n"
-
-        categories = [
-            ("general", "WORLD NEWS"),
-            ("ai", "AI & MACHINE LEARNING"),
-            ("tech", "TECHNOLOGY"),
-            ("local", "LOCAL NEWS")
-        ]
-
-        for category, label in categories:
-            if category not in self.summaries_cache or not self.summaries_cache[category]:
-                continue
-
-            summary = self.summaries_cache[category]
-
-            # Add category header if not already in summary
-            if label not in summary:
-                briefing += f"\n{label}\n{'-' * len(label)}\n"
-
-            briefing += f"{summary}\n\n"
-
-        briefing += "=" * 40 + "\n"
-        briefing += "Stay informed! Reply STOP to unsubscribe."
-
-        logger.info(f"Daily briefing created ({len(briefing)} chars)")
-
-        return briefing
 
     def send_to_subscribers(self, message: str, subscribers: List[str]) -> Dict:
         """
@@ -253,13 +239,10 @@ class DailyNewsService:
             # 2. Fetch news for all categories
             self.fetch_all_news()
 
-            # 3. Generate AI summaries
-            self.generate_summaries()
+            # 3. Generate single AI briefing for all categories
+            briefing = self.generate_single_briefing()
 
-            # 4. Create daily briefing
-            briefing = self.create_daily_briefing()
-
-            # 5. Send to subscribers
+            # 4. Send to subscribers
             results = self.send_to_subscribers(briefing, subscribers)
 
             # 6. Log summary
@@ -271,9 +254,8 @@ class DailyNewsService:
             logger.info(f"Briefing length: {len(briefing)} characters")
             logger.info("=" * 60)
 
-            # 7. Clear cache (in-memory, so happens automatically at script end)
+            # 5. Clear cache (in-memory, so happens automatically at script end)
             self.articles_cache.clear()
-            self.summaries_cache.clear()
 
         except Exception as e:
             logger.error(f"Fatal error in daily news service: {e}", exc_info=True)
