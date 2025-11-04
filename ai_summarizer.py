@@ -68,7 +68,8 @@ class NewsSummarizer:
         self,
         provider: str = None,
         api_key: str = None,
-        model: str = None
+        model: str = None,
+        prompt_file: str = None
     ):
         """
         Initialize AI summarizer with configurable provider
@@ -77,6 +78,7 @@ class NewsSummarizer:
             provider: AI provider ('claude' or 'gemini', defaults to env AI_PROVIDER or 'claude')
             api_key: API key (defaults to provider-specific env var)
             model: Model name (defaults to provider-specific default)
+            prompt_file: Path to prompt template file (defaults to 'prompt_config.txt')
         """
         # Determine provider
         self.provider_name = provider or os.getenv('AI_PROVIDER', 'claude').lower()
@@ -101,7 +103,61 @@ class NewsSummarizer:
             model = model or os.getenv('GEMINI_MODEL', 'gemini-2.0-flash-exp')
             self.provider = GeminiProvider(api_key, model)
 
+        # Load prompt template
+        self.prompt_file = prompt_file or os.getenv('PROMPT_CONFIG_FILE', 'prompt_config.txt')
+        self.prompt_template = self._load_prompt_template()
+
         logger.info(f"Initialized NewsSummarizer with provider: {self.provider_name}")
+
+    def _load_prompt_template(self) -> str:
+        """
+        Load prompt template from file
+
+        Returns:
+            Prompt template string
+        """
+        try:
+            # Try relative to script directory first
+            if not os.path.isabs(self.prompt_file):
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                prompt_path = os.path.join(script_dir, self.prompt_file)
+            else:
+                prompt_path = self.prompt_file
+
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                template = f.read().strip()
+                logger.info(f"Loaded prompt template from {prompt_path}")
+                return template
+
+        except FileNotFoundError:
+            logger.warning(f"Prompt file not found: {self.prompt_file}. Using default prompt.")
+            return self._get_default_prompt()
+        except Exception as e:
+            logger.error(f"Error loading prompt file: {e}. Using default prompt.")
+            return self._get_default_prompt()
+
+    def _get_default_prompt(self) -> str:
+        """
+        Get default prompt template if file loading fails
+
+        Returns:
+            Default prompt template string
+        """
+        return """You are a news summarization assistant. Create a concise, SMS-friendly daily news briefing for {category_desc}.
+
+Here are today's top articles:
+{article_text}
+
+Generate a brief, informative summary that:
+1. Highlights the most important stories (3-5 key stories)
+2. Is optimized for SMS delivery (concise but informative)
+3. Uses clear, accessible language
+4. Can be 500-1200 characters (aim for readability on a phone screen)
+5. Includes a brief headline or key point for each major story
+6. Does NOT use emojis or special formatting
+7. Separates stories with clear line breaks
+
+Format as a clean text summary suitable for SMS delivery."""
 
     def summarize_articles(
         self,
@@ -145,7 +201,7 @@ class NewsSummarizer:
 
     def _build_prompt(self, articles: List[Dict], category: str) -> str:
         """
-        Build prompt for Claude with article data
+        Build prompt with article data using template from file
 
         Args:
             articles: List of articles
@@ -176,21 +232,11 @@ class NewsSummarizer:
             if content:
                 article_text += f"   Preview: {content}\n"
 
-        prompt = f"""You are a news summarization assistant. Create a concise, SMS-friendly daily news briefing for {category_desc}.
-
-Here are today's top articles:
-{article_text}
-
-Generate a brief, informative summary that:
-1. Highlights the most important stories (3-5 key stories)
-2. Is optimized for SMS delivery (concise but informative)
-3. Uses clear, accessible language
-4. Can be 500-1200 characters (aim for readability on a phone screen)
-5. Includes a brief headline or key point for each major story
-6. Does NOT use emojis or special formatting
-7. Separates stories with clear line breaks
-
-Format as a clean text summary suitable for SMS delivery."""
+        # Use template from file with variable substitution
+        prompt = self.prompt_template.format(
+            category_desc=category_desc,
+            article_text=article_text
+        )
 
         return prompt
 

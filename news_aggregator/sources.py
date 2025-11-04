@@ -8,16 +8,6 @@ NEWS_SOURCES = {
             "name": "BBC World News",
             "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
             "type": "rss"
-        },
-        {
-            "name": "Reuters World News",
-            "url": "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best",
-            "type": "rss"
-        },
-        {
-            "name": "AP News",
-            "url": "https://rsshub.app/apnews/topics/apf-topnews",
-            "type": "rss"
         }
     ],
     "ai": [
@@ -32,13 +22,8 @@ NEWS_SOURCES = {
             "type": "rss"
         },
         {
-            "name": "Machine Learning Subreddit",
-            "url": "https://www.reddit.com/r/MachineLearning/top/.rss?t=day",
-            "type": "rss"
-        },
-        {
-            "name": "AI News",
-            "url": "https://www.artificialintelligence-news.com/feed/",
+            "name": "Google DeepMind Blog",
+            "url": "https://blog.google/technology/google-deepmind/rss/",
             "type": "rss"
         }
     ],
@@ -52,21 +37,14 @@ NEWS_SOURCES = {
             "name": "TechCrunch",
             "url": "https://techcrunch.com/feed/",
             "type": "rss"
-        },
-        {
-            "name": "The Verge",
-            "url": "https://www.theverge.com/rss/index.xml",
-            "type": "rss"
-        },
-        {
-            "name": "Ars Technica",
-            "url": "https://feeds.arstechnica.com/arstechnica/index",
-            "type": "rss"
         }
     ],
     "local": [
-        # Will be configured based on user location
-        # Placeholder for now
+        {
+            "name": "BBC Turkish",
+            "url": "https://feeds.bbci.co.uk/turkce/rss.xml",
+            "type": "rss"
+        }
     ]
 }
 

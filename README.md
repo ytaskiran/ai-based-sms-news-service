@@ -92,13 +92,17 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 
 6. **Test the full script**:
    ```bash
+   # Test mode: no real SMS sent (recommended for first run)
+   python3 send_daily_news.py --test
+
+   # Production mode: send real SMS
    python3 send_daily_news.py
    ```
 
    This will:
    - Fetch latest news from RSS feeds
    - Generate AI summaries
-   - Send to all subscribers
+   - Send to all subscribers (or simulate in test mode)
    - Log results to `logs/daily_news.log`
 
 ## Scheduling with Cron
@@ -207,9 +211,34 @@ NEWS_SOURCES = {
 }
 ```
 
+### Customize AI Prompt
+
+The AI summarization prompt is now fully configurable via the `prompt_config.txt` file:
+
+**1. Edit the prompt file**:
+   ```bash
+   nano prompt_config.txt
+   ```
+
+**2. Customize the template** using these placeholders:
+   - `{category_desc}`: Automatically filled with category description (e.g., "world news and current events")
+   - `{article_text}`: Automatically filled with formatted article list
+
+**3. Environment variable override** (optional):
+   ```bash
+   # Use a different prompt file
+   PROMPT_CONFIG_FILE=/path/to/custom_prompt.txt
+   ```
+
+**4. Programmatic override** (optional):
+   ```python
+   from ai_summarizer import NewsSummarizer
+   summarizer = NewsSummarizer(prompt_file='custom_prompt.txt')
+   ```
+
 ### Adjust Summary Length
 
-Edit `ai_summarizer.py` and modify the prompt:
+Edit `ai_summarizer.py` and modify the max_tokens parameter:
 
 ```python
 # Change max_tokens for longer/shorter summaries
@@ -261,17 +290,51 @@ python3 -c "from news_aggregator.fetcher import fetch_news; print(fetch_news('ge
 python3 -c "from ai_summarizer import NewsSummarizer; s = NewsSummarizer(provider='gemini'); print('Gemini configured')"
 python3 -c "from ai_summarizer import NewsSummarizer; s = NewsSummarizer(provider='claude'); print('Claude configured')"
 
-# Test full script
+# Test full script WITHOUT sending real SMS (dry-run)
+python3 send_daily_news.py --test
+
+# Test full script with real SMS delivery
 python3 send_daily_news.py
 ```
 
 ### Manual Execution
 ```bash
-# Run the daily news script manually
+# Run the daily news script manually (test mode)
+python3 send_daily_news.py --test
+
+# Run in production mode (sends real SMS)
 python3 send_daily_news.py
 
 # Run with verbose logging
-python3 send_daily_news.py 2>&1 | tee logs/manual_run.log
+python3 send_daily_news.py --test 2>&1 | tee logs/manual_run.log
+```
+
+### Test Mode (--test flag)
+
+The `--test` flag enables dry-run mode for safe testing:
+
+**What it does:**
+- ✅ Fetches real news from RSS feeds
+- ✅ Generates real AI summaries
+- ✅ Logs complete message content and recipients
+- ❌ Does NOT send actual SMS messages via Twilio
+- ❌ Does NOT consume SMS credits
+
+**Usage:**
+```bash
+# Test the entire pipeline without sending SMS
+python3 send_daily_news.py --test
+
+# Check the logs to see what would have been sent
+tail -f logs/daily_news.log
+```
+
+**When to use test mode:**
+- First-time setup and testing
+- Testing configuration changes
+- Verifying news sources and AI summaries
+- Debugging without SMS costs
+- Checking message formatting and length
 
 ---
 

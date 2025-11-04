@@ -9,6 +9,7 @@ import os
 import sys
 import json
 import logging
+import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict
@@ -41,17 +42,19 @@ logger = logging.getLogger(__name__)
 class DailyNewsService:
     """Orchestrates daily news fetching, summarization, and SMS delivery"""
 
-    def __init__(self, subscribers_file: str = "subscribers.json"):
+    def __init__(self, subscribers_file: str = "subscribers.json", test_mode: bool = False):
         """
         Initialize the daily news service
 
         Args:
             subscribers_file: Path to JSON file with subscriber phone numbers
+            test_mode: If True, don't send real SMS (dry-run mode)
         """
         self.subscribers_file = Path(subscribers_file)
+        self.test_mode = test_mode
         self.news_fetcher = NewsFetcher()
         self.summarizer = NewsSummarizer()
-        self.sms_service = SMSService()
+        self.sms_service = SMSService(dry_run=test_mode)
 
         # In-memory cache for this execution
         self.articles_cache = {}
@@ -235,6 +238,8 @@ class DailyNewsService:
         """
         logger.info("=" * 60)
         logger.info(f"Starting daily news service - {datetime.now()}")
+        if self.test_mode:
+            logger.info("**TEST MODE ENABLED** - No real SMS will be sent")
         logger.info("=" * 60)
 
         try:
@@ -277,7 +282,18 @@ class DailyNewsService:
 
 def main():
     """Entry point for the script"""
-    service = DailyNewsService()
+    parser = argparse.ArgumentParser(
+        description='Daily News SMS Service - Fetches news, generates AI summaries, and sends to subscribers'
+    )
+    parser.add_argument(
+        '--test',
+        action='store_true',
+        help='Test mode: fetch news and generate summaries but don\'t send real SMS messages'
+    )
+
+    args = parser.parse_args()
+
+    service = DailyNewsService(test_mode=args.test)
     service.run()
 
 

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class SMSService:
     """Handle SMS sending with Twilio, including retry logic"""
 
-    def __init__(self, account_sid: str = None, auth_token: str = None, from_number: str = None):
+    def __init__(self, account_sid: str = None, auth_token: str = None, from_number: str = None, dry_run: bool = False):
         """
         Initialize Twilio client
 
@@ -24,15 +24,21 @@ class SMSService:
             account_sid: Twilio Account SID (defaults to env var)
             auth_token: Twilio Auth Token (defaults to env var)
             from_number: Twilio phone number (defaults to env var)
+            dry_run: If True, simulate SMS sending without actually sending (test mode)
         """
+        self.dry_run = dry_run
         self.account_sid = account_sid or os.getenv('TWILIO_ACCOUNT_SID')
         self.auth_token = auth_token or os.getenv('TWILIO_AUTH_TOKEN')
         self.from_number = from_number or os.getenv('TWILIO_PHONE_NUMBER')
 
-        if not all([self.account_sid, self.auth_token, self.from_number]):
-            raise ValueError("Missing Twilio credentials. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER")
-
-        self.client = Client(self.account_sid, self.auth_token)
+        # In dry-run mode, we don't need real credentials
+        if not dry_run:
+            if not all([self.account_sid, self.auth_token, self.from_number]):
+                raise ValueError("Missing Twilio credentials. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER")
+            self.client = Client(self.account_sid, self.auth_token)
+        else:
+            self.client = None
+            logger.info("SMS Service initialized in DRY-RUN mode - no messages will be sent")
 
     def send_sms(
         self,
@@ -53,6 +59,20 @@ class SMSService:
         Returns:
             Dict with status and details
         """
+        # Dry-run mode: simulate successful send
+        if self.dry_run:
+            logger.info(f"[DRY-RUN] Would send SMS to {to_number}")
+            logger.info(f"[DRY-RUN] Message preview (first 200 chars): {message[:200]}...")
+            logger.info(f"[DRY-RUN] Message length: {len(message)} characters")
+            return {
+                "success": True,
+                "to": to_number,
+                "sid": "DRY_RUN_SID",
+                "status": "simulated",
+                "attempts": 1,
+                "dry_run": True
+            }
+
         attempt = 0
         delay = initial_delay
 
