@@ -2,6 +2,36 @@
 
 An automated SMS-based news service that delivers AI-powered daily news briefings via text message. Perfect for staying informed on basic phones or when smartphone access is limited.
 
+## Quick Start
+
+Get up and running in 3 steps:
+
+```bash
+# 1. Run automated setup
+./setup.sh
+# or: make setup
+
+# 2. Edit configuration files
+#    - .env: Add your API keys (Twilio, Gemini/Claude)
+#    - subscribers.json: Add phone numbers
+
+# 3. Test the service
+./run.sh --test
+# or: make test
+```
+
+That's it! See detailed setup instructions below.
+
+### Available Make Commands
+
+```bash
+make setup   # Create venv and install dependencies
+make test    # Run in test mode (no real SMS)
+make run     # Run in production mode (sends SMS)
+make clean   # Remove venv and generated files
+make help    # Show all commands
+```
+
 ## Overview
 
 This service runs as a scheduled daily job that:
@@ -35,7 +65,9 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 - **ai_summarizer.py**: Generates summaries using Claude or Gemini APIs (configurable)
 - **prompt_config.txt**: Customizable AI prompt template
 - **sms_service.py**: Handles SMS delivery with retry logic
-- **subscribers.json**: List of subscriber phone numbers
+- **subscribers.json**: List of subscriber phone numbers (created from `subscribers.json.example`)
+- **setup.sh**: Automated setup script for virtual environment
+- **run.sh**: Convenience script to run the service
 
 ## Setup
 
@@ -50,9 +82,27 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 
 ### Installation
 
-1. **Clone the repository**:
+#### Option 1: Automated Setup (Recommended)
+
+Run the automated setup script that creates a virtual environment and installs all dependencies:
+
+```bash
+./setup.sh
+```
+
+This will:
+- Create a Python virtual environment in `venv/`
+- Install all required dependencies
+- Create `.env` from `.env.example` (if not exists)
+- Create `subscribers.json` from `subscribers.json.example` (if not exists)
+
+#### Option 2: Manual Setup
+
+1. **Create virtual environment**:
    ```bash
-   cd sms_news
+   python3 -m venv venv
+   source venv/bin/activate  # On macOS/Linux
+   # venv\Scripts\activate   # On Windows
    ```
 
 2. **Install dependencies**:
@@ -60,47 +110,49 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
    pip install -r requirements.txt
    ```
 
-3. **Configure environment variables**:
+3. **Configure environment variables and subscribers**:
    ```bash
    cp .env.example .env
-   # Edit .env with your credentials
+   cp subscribers.json.example subscribers.json
+   # Edit both files with your credentials and phone numbers
    ```
 
-   Required variables:
-   - `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
-   - `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
-   - `TWILIO_PHONE_NUMBER`: Your Twilio phone number (E.164 format, e.g., +1234567890)
-   - `SMS_MODE`: Message splitting mode - `segment` (120 chars) or `long` (1600 chars) (default: `segment`)
-   - `AI_PROVIDER`: Choose `gemini` or `claude` (default: `claude`)
-   - `GEMINI_API_KEY`: Your Google AI API key (if using Gemini - get from https://aistudio.google.com/apikey)
-   - `CLAUDE_API_KEY`: Your Anthropic API key (if using Claude)
+**Configure your `.env` file** with these required variables:
+- `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
+- `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
+- `TWILIO_PHONE_NUMBER`: Your Twilio phone number (E.164 format, e.g., +1234567890)
+- `SMS_MODE`: Message splitting mode - `segment` (120 chars) or `long` (1600 chars) (default: `segment`)
+- `AI_PROVIDER`: Choose `gemini` or `claude` (default: `claude`)
+- `GEMINI_API_KEY`: Your Google AI API key (if using Gemini - get from https://aistudio.google.com/apikey)
+- `CLAUDE_API_KEY`: Your Anthropic API key (if using Claude)
 
-4. **Add subscribers**:
-   Edit `subscribers.json` and add phone numbers in E.164 format:
-   ```json
-   {
-     "subscribers": [
-       "+11234567890",
-       "+10987654321"
-     ]
-   }
-   ```
+**Add subscribers** by editing `subscribers.json`:
+```json
+{
+  "subscribers": [
+    "+11234567890",
+    "+10987654321"
+  ]
+}
+```
 
-5. **Test AI provider configuration**:
-   ```bash
-   python3 test_ai_summaries.py
-   ```
+### Testing
 
-   This will test your configured AI provider with sample articles.
+After installation, test the service:
 
-6. **Test the full script**:
-   ```bash
-   # Test mode: no real SMS sent (recommended for first run)
-   python3 send_daily_news.py --test
+```bash
+# If using automated setup, use the run script
+./run.sh --test
 
-   # Production mode: send real SMS
-   python3 send_daily_news.py
-   ```
+# Or activate venv manually and run
+source venv/bin/activate
+python3 send_daily_news.py --test
+
+# Production mode (sends real SMS)
+./run.sh
+# or
+source venv/bin/activate && python3 send_daily_news.py
+```
 
    This will:
    - Fetch latest news from RSS feeds
@@ -119,12 +171,19 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 
 2. **Add cron job** (runs at 7 AM daily):
    ```bash
-   0 7 * * * cd /path/to/sms_news && /usr/bin/python3 send_daily_news.py >> /path/to/sms_news/daily_news.log 2>&1
+   0 7 * * * cd /path/to/ai-based-sms-news-service && ./run.sh >> daily_news.log 2>&1
    ```
 
-   Replace `/path/to/sms_news` with your actual project path.
+   Replace `/path/to/ai-based-sms-news-service` with your actual project path.
 
-   This redirects all output (stdout and stderr) to `daily_news.log` in your project directory.
+   This:
+   - Uses the `run.sh` script which automatically activates the virtual environment
+   - Redirects all output (stdout and stderr) to `daily_news.log`
+
+   **Alternative (using venv directly):**
+   ```bash
+   0 7 * * * cd /path/to/ai-based-sms-news-service && ./venv/bin/python send_daily_news.py >> daily_news.log 2>&1
+   ```
 
 3. **Save and exit**
 
@@ -137,19 +196,19 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 
 ```bash
 # Daily at 7 AM (with logging)
-0 7 * * * cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
+0 7 * * * cd /path/to/ai-based-sms-news-service && ./run.sh >> daily_news.log 2>&1
 
 # Daily at 8:30 AM
-30 8 * * * cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
+30 8 * * * cd /path/to/ai-based-sms-news-service && ./run.sh >> daily_news.log 2>&1
 
 # Weekdays only at 7 AM
-0 7 * * 1-5 cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
+0 7 * * 1-5 cd /path/to/ai-based-sms-news-service && ./run.sh >> daily_news.log 2>&1
 
 # Twice daily (7 AM and 6 PM)
-0 7,18 * * * cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
+0 7,18 * * * cd /path/to/ai-based-sms-news-service && ./run.sh >> daily_news.log 2>&1
 
 # With log rotation (keep only last 1000 lines)
-0 7 * * * cd /path/to/sms_news && (python3 send_daily_news.py 2>&1 | tail -1000 >> daily_news.log)
+0 7 * * * cd /path/to/ai-based-sms-news-service && (./run.sh 2>&1 | tail -1000 >> daily_news.log)
 ```
 
 2. Add secrets in GitHub repository settings:
@@ -360,8 +419,28 @@ Update your cron schedule (see Scheduling section above).
 
 ## Development
 
+### Working with Virtual Environment
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Deactivate when done
+deactivate
+
+# Update dependencies
+pip install <package>
+pip freeze > requirements.txt
+
+# Or use the run script (auto-activates venv)
+./run.sh --test
+```
+
 ### Run Tests
 ```bash
+# Activate venv first
+source venv/bin/activate
+
 # Test AI provider configuration
 python3 test_ai_summaries.py
 
@@ -373,22 +452,28 @@ python3 -c "from ai_summarizer import NewsSummarizer; s = NewsSummarizer(provide
 python3 -c "from ai_summarizer import NewsSummarizer; s = NewsSummarizer(provider='claude'); print('Claude configured')"
 
 # Test full script WITHOUT sending real SMS (dry-run)
+./run.sh --test
+# or
 python3 send_daily_news.py --test
 
 # Test full script with real SMS delivery
-python3 send_daily_news.py
+./run.sh
 ```
 
 ### Manual Execution
 ```bash
-# Run the daily news script manually (test mode)
+# Using run script (recommended - auto-activates venv)
+./run.sh --test
+
+# Or activate venv manually
+source venv/bin/activate
 python3 send_daily_news.py --test
 
 # Run in production mode (sends real SMS)
-python3 send_daily_news.py
+./run.sh
 
 # Run and save output to a log file
-python3 send_daily_news.py --test 2>&1 | tee manual_run.log
+./run.sh --test 2>&1 | tee manual_run.log
 ```
 
 ### Test Mode (--test flag)
