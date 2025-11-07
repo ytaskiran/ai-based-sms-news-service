@@ -23,17 +23,11 @@ from sms_service import SMSService
 # Load environment variables
 load_dotenv()
 
-# Configure logging
-LOG_DIR = Path("logs")
-LOG_DIR.mkdir(exist_ok=True)
-
+# Configure logging (output to stdout, redirect via pipes in cron)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_DIR / "daily_news.log"),
-        logging.StreamHandler(sys.stdout)
-    ]
+    stream=sys.stdout
 )
 
 logger = logging.getLogger(__name__)

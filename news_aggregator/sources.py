@@ -17,8 +17,8 @@ NEWS_SOURCES = {
             "type": "rss"
         },
         {
-            "name": "Anthropic News",
-            "url": "https://www.anthropic.com/news/rss.xml",
+            "name": "AI News",
+            "url": "https://www.artificialintelligence-news.com/feed/rss/",
             "type": "rss"
         },
         {

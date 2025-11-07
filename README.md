@@ -36,7 +36,6 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 - **prompt_config.txt**: Customizable AI prompt template
 - **sms_service.py**: Handles SMS delivery with retry logic
 - **subscribers.json**: List of subscriber phone numbers
-- **logs/**: Execution logs
 
 ## Setup
 
@@ -71,6 +70,7 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
    - `TWILIO_ACCOUNT_SID`: Your Twilio Account SID
    - `TWILIO_AUTH_TOKEN`: Your Twilio Auth Token
    - `TWILIO_PHONE_NUMBER`: Your Twilio phone number (E.164 format, e.g., +1234567890)
+   - `SMS_MODE`: Message splitting mode - `segment` (120 chars) or `long` (1600 chars) (default: `segment`)
    - `AI_PROVIDER`: Choose `gemini` or `claude` (default: `claude`)
    - `GEMINI_API_KEY`: Your Google AI API key (if using Gemini - get from https://aistudio.google.com/apikey)
    - `CLAUDE_API_KEY`: Your Anthropic API key (if using Claude)
@@ -106,7 +106,7 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
    - Fetch latest news from RSS feeds
    - Generate AI summaries
    - Send to all subscribers (or simulate in test mode)
-   - Log results to `logs/daily_news.log`
+   - Output logs to stdout (can be redirected to a file)
 
 ## Scheduling with Cron
 
@@ -119,10 +119,12 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 
 2. **Add cron job** (runs at 7 AM daily):
    ```bash
-   0 7 * * * cd /path/to/sms_news && /usr/bin/python3 send_daily_news.py >> logs/cron.log 2>&1
+   0 7 * * * cd /path/to/sms_news && /usr/bin/python3 send_daily_news.py >> /path/to/sms_news/daily_news.log 2>&1
    ```
 
    Replace `/path/to/sms_news` with your actual project path.
+
+   This redirects all output (stdout and stderr) to `daily_news.log` in your project directory.
 
 3. **Save and exit**
 
@@ -134,17 +136,20 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 ### Cron Schedule Examples
 
 ```bash
-# Daily at 7 AM
-0 7 * * * cd /path/to/sms_news && python3 send_daily_news.py
+# Daily at 7 AM (with logging)
+0 7 * * * cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
 
 # Daily at 8:30 AM
-30 8 * * * cd /path/to/sms_news && python3 send_daily_news.py
+30 8 * * * cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
 
 # Weekdays only at 7 AM
-0 7 * * 1-5 cd /path/to/sms_news && python3 send_daily_news.py
+0 7 * * 1-5 cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
 
 # Twice daily (7 AM and 6 PM)
-0 7,18 * * * cd /path/to/sms_news && python3 send_daily_news.py
+0 7,18 * * * cd /path/to/sms_news && python3 send_daily_news.py >> daily_news.log 2>&1
+
+# With log rotation (keep only last 1000 lines)
+0 7 * * * cd /path/to/sms_news && (python3 send_daily_news.py 2>&1 | tail -1000 >> daily_news.log)
 ```
 
 2. Add secrets in GitHub repository settings:
@@ -157,15 +162,20 @@ RSS Feeds → News Fetcher → AI API (Claude/Gemini) → Twilio SMS → Subscri
 
 ### View Logs
 
+When running with cron, logs are redirected to a file (see Cron examples above).
+
 ```bash
-# View latest logs
-tail -f logs/daily_news.log
+# View latest logs (if redirected to daily_news.log)
+tail -f daily_news.log
 
 # View today's logs
-grep "$(date +%Y-%m-%d)" logs/daily_news.log
+grep "$(date +%Y-%m-%d)" daily_news.log
 
 # Check for errors
-grep ERROR logs/daily_news.log
+grep ERROR daily_news.log
+
+# Run manually and view output in real-time
+python3 send_daily_news.py --test
 ```
 
 ### Log Format
@@ -184,7 +194,49 @@ Example:
 2025-01-26 07:00:25 - sms_service - INFO - SMS sent successfully to +11234567890
 ```
 
+### Log Rotation
+
+For long-running deployments, consider rotating logs to prevent the file from growing too large:
+
+```bash
+# Option 1: Use logrotate (create /etc/logrotate.d/sms-news)
+/path/to/sms_news/daily_news.log {
+    weekly
+    rotate 4
+    compress
+    missingok
+    notifempty
+}
+
+# Option 2: Manual rotation in cron
+0 7 * * 0 cd /path/to/sms_news && mv daily_news.log daily_news.log.old && python3 send_daily_news.py >> daily_news.log 2>&1
+```
+
 ## Customization
+
+### SMS Mode Configuration
+
+Configure how long messages are split for SMS delivery in your `.env` file:
+
+```bash
+# Segment mode: Split into 120-char segments (default)
+# - More SMS messages sent
+# - Better for basic SMS plans
+# - Format: [1/25] message content here
+SMS_MODE=segment
+
+# Long mode: Split into 1600-char segments
+# - Fewer messages (requires MMS support)
+# - May incur MMS charges with some carriers
+# - Format: [1/2] message content here
+SMS_MODE=long
+```
+
+**Cost Comparison Example** (3000 char briefing):
+- `segment` mode: ~25 SMS messages per subscriber
+- `long` mode: ~2 SMS messages per subscriber
+
+**Recommendation**: Use `segment` mode for standard SMS plans, `long` mode if you have unlimited MMS or need fewer messages.
 
 ### Switch AI Providers
 
@@ -294,7 +346,7 @@ Update your cron schedule (see Scheduling section above).
 - Verify Twilio credentials in `.env`
 - Check Twilio account balance
 - Verify phone numbers are in E.164 format (+1234567890)
-- Check logs: `grep ERROR logs/daily_news.log`
+- Check logs: `grep ERROR daily_news.log` (or run manually to see real-time output)
 
 ### No news fetched
 - Check internet connection
@@ -335,8 +387,8 @@ python3 send_daily_news.py --test
 # Run in production mode (sends real SMS)
 python3 send_daily_news.py
 
-# Run with verbose logging
-python3 send_daily_news.py --test 2>&1 | tee logs/manual_run.log
+# Run and save output to a log file
+python3 send_daily_news.py --test 2>&1 | tee manual_run.log
 ```
 
 ### Test Mode (--test flag)
@@ -352,11 +404,11 @@ The `--test` flag enables dry-run mode for safe testing:
 
 **Usage:**
 ```bash
-# Test the entire pipeline without sending SMS
+# Test the entire pipeline without sending SMS (view output in real-time)
 python3 send_daily_news.py --test
 
-# Check the logs to see what would have been sent
-tail -f logs/daily_news.log
+# Test and save output to a file
+python3 send_daily_news.py --test 2>&1 | tee test_run.log
 ```
 
 **When to use test mode:**

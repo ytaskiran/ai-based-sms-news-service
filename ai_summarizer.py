@@ -41,6 +41,7 @@ class GeminiProvider(AIProvider):
     def __init__(self, api_key: str, model: str = "gemini-2.0-flash-exp"):
         try:
             import google.generativeai as genai
+            from google.generativeai.types import HarmCategory, HarmBlockThreshold
         except ImportError:
             raise ImportError(
                 "google-generativeai package not installed. "
@@ -48,7 +49,18 @@ class GeminiProvider(AIProvider):
             )
 
         genai.configure(api_key=api_key)
+
+        # Configure safety settings for news content (less restrictive)
+        # News may contain sensitive topics that shouldn't be blocked
+        self.safety_settings = {
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        }
+
         self.model = genai.GenerativeModel(model)
+        self.genai = genai  # Keep reference for FinishReason enum
 
     def summarize(self, prompt: str, max_tokens: int = 1024) -> str:
         response = self.model.generate_content(
@@ -56,8 +68,69 @@ class GeminiProvider(AIProvider):
             generation_config={
                 "max_output_tokens": max_tokens,
                 "temperature": 0.7,
-            }
+            },
+            safety_settings=self.safety_settings
         )
+
+        # Check if response was blocked at prompt level
+        if not response.candidates:
+            raise ValueError(
+                f"Gemini blocked the response. Prompt feedback: {response.prompt_feedback}"
+            )
+
+        candidate = response.candidates[0]
+
+        # Check finish reason
+        # FinishReason values: FINISH_REASON_UNSPECIFIED=0, STOP=1, MAX_TOKENS=2, SAFETY=3, RECITATION=4, OTHER=5
+        # Use numeric comparison for compatibility across SDK versions
+        finish_reason_value = int(candidate.finish_reason)
+
+        # Check if we have valid parts/content before accessing text
+        # The SDK throws an error when accessing response.text if no valid parts exist
+        has_valid_parts = (
+            hasattr(candidate, 'content') and
+            hasattr(candidate.content, 'parts') and
+            len(candidate.content.parts) > 0
+        )
+
+        if not has_valid_parts:
+            finish_reason_name = candidate.finish_reason.name if hasattr(candidate.finish_reason, 'name') else str(candidate.finish_reason)
+
+            # Get safety ratings if available
+            safety_info = ""
+            if hasattr(candidate, 'safety_ratings') and candidate.safety_ratings:
+                safety_info = f"\nSafety ratings: {candidate.safety_ratings}"
+
+            error_msg = f"Gemini returned no content. Finish reason: {finish_reason_name} (value: {finish_reason_value}){safety_info}\n"
+
+            if finish_reason_value == 2:  # MAX_TOKENS - hit output limit
+                error_msg += "Hit the output token limit before generating valid content. This is unusual.\n"
+                error_msg += "Possible causes:\n"
+                error_msg += "1. Output token limit is too low (try increasing max_tokens)\n"
+                error_msg += "2. Model started generating but was blocked mid-stream\n"
+                error_msg += "3. Safety filters triggered during generation\n"
+                error_msg += "Note: This was just fixed - token limit increased from 2048 to 4096. Try again."
+            elif finish_reason_value == 3:  # SAFETY
+                error_msg += "Content was blocked by safety filters. Try adjusting news sources or use Claude provider."
+            elif finish_reason_value == 4:  # RECITATION
+                error_msg += "Content was blocked due to recitation (too similar to training data)."
+            else:
+                error_msg += "Generation stopped unexpectedly."
+
+            raise ValueError(error_msg)
+
+        # 1 = STOP (normal completion), 2 = MAX_TOKENS (also acceptable for valid content)
+        if finish_reason_value not in [1, 2]:
+            finish_reason_name = candidate.finish_reason.name if hasattr(candidate.finish_reason, 'name') else str(candidate.finish_reason)
+            safety_info = ""
+            if hasattr(candidate, 'safety_ratings') and candidate.safety_ratings:
+                safety_info = f"\nSafety ratings: {candidate.safety_ratings}"
+
+            raise ValueError(
+                f"Gemini stopped with finish_reason: {finish_reason_name} (value: {finish_reason_value}){safety_info}"
+            )
+
+        # Now safe to access response.text
         return response.text.strip()
 
 
@@ -203,10 +276,18 @@ LOCAL NEWS
         try:
             logger.info(f"Generating summary for {len(articles)} {category} articles using {self.provider_name}")
 
+            # Log prompt
+            logger.debug(f"Prompt for {category}:")
+            logger.debug(prompt)
+
             # Call AI provider
             summary = self.provider.summarize(prompt, max_tokens=1024)
 
             logger.info(f"Generated summary for {category} ({len(summary)} chars)")
+
+            # Log response
+            logger.debug(f"Response for {category}:")
+            logger.debug(summary)
 
             return summary
 
@@ -353,9 +434,23 @@ LOCAL NEWS
             print("=" * 80 + "\n")
 
             # Single AI call for all categories
-            briefing = self.provider.summarize(prompt, max_tokens=2048)
+            briefing = self.provider.summarize(prompt, max_tokens=10000)
 
             logger.info(f"Generated complete briefing ({len(briefing)} chars)")
+
+            # Log the AI response
+            logger.debug("=" * 80)
+            logger.debug("RESPONSE FROM AI MODEL:")
+            logger.debug("=" * 80)
+            logger.debug(briefing)
+            logger.debug("=" * 80)
+
+            # Also print to console for immediate visibility
+            print("\n" + "=" * 80)
+            print("RESPONSE FROM AI MODEL:")
+            print("=" * 80)
+            print(briefing)
+            print("=" * 80 + "\n")
 
             return briefing
 
